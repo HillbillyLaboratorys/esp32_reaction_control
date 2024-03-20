@@ -18,24 +18,6 @@ esp_err_t i2c_master_init(void) {
     return i2c_driver_install(I2C_PORT, conf.mode, 0, 0, 0);
 }
 
-// esp_err_t i2c_acc_init(void) { 
-//     i2c_config_t conf_slave = {
-//         .sda_io_num = I2C_SDA,            // SDA GPIO 
-//         .sda_pullup_en = GPIO_PULLUP_ENABLE,
-//         .scl_io_num = I2C_SCL,            // SCL GPIO 
-//         .scl_pullup_en = GPIO_PULLUP_ENABLE,
-//         .mode = I2C_MODE_SLAVE,
-//         .slave.addr_10bit_en = 0,
-//         .slave.slave_addr = I2C_ACC_ADD,        // slave address 
-//         .slave.maximum_speed = I2C_CLK // expected maximum clock speed
-//         .clk_flags = 0,                 // optional; clock sorce
-//     };
-//     esp_err_t err = i2c_param_config(I2C_PORT, &conf_slave);
-//     if (err != ESP_OK) {
-//         return err;
-//     }
-//     return i2c_driver_install(I2C_PORT, conf_slave.mode, 0, 0, 0);
-// }
 
 esp_err_t i2c_write_to_bus(uint8_t dev_add, uint8_t* data, size_t len) {
 
@@ -71,7 +53,7 @@ esp_err_t i2c_read_from_bus(uint8_t dev_add, uint8_t* data, size_t len) {
 }
 
 esp_err_t write_to_lsm6dsl(uint8_t sub_add, uint8_t _command) {
-
+    //i2c_master_write_to_device()
      i2c_cmd_handle_t _cmd_hndl = i2c_cmd_link_create();
     esp_err_t err = i2c_master_start(_cmd_hndl);
     if (err != ESP_OK) {
@@ -106,4 +88,15 @@ esp_err_t read_from_lsm6dsl(uint8_t sub_add, uint8_t* data, size_t len) {
     esp_err_t err = i2c_master_cmd_begin(I2C_PORT, cmd, 1000 / portTICK_PERIOD_MS);
     i2c_cmd_link_delete(cmd);
     return err;
+}
+
+void read_registers(uint8_t reg_addr, uint8_t* data, uint8_t len) {
+        
+    i2c_master_write_read_device(I2C_PORT, I2C_ACC_ADD, &reg_addr, 1, data, len, pdMS_TO_TICKS(1000));
+
+}
+
+void wright_regester(uint8_t reg_addr, uint8_t* data, uint8_t len) {
+
+    i2c_master_write_to_device(I2C_PORT, I2C_ACC_ADD, data, len, pdMS_TO_TICKS(1000));
 }

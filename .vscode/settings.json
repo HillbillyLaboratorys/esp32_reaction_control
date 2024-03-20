@@ -14,5 +14,10 @@
     ],
     "idf.pythonBinPathWin": "C:\\Users\\SimmermanEvan\\.espressif\\python_env\\idf5.1_py3.11_env\\Scripts\\python.exe",
     "idf.toolsPathWin": "C:\\Users\\SimmermanEvan\\.espressif",
-    "idf.portWin": "COM5"
+    "idf.portWin": "COM5",
+    "files.associations": {
+        "*.embeddedhtml": "html",
+        "cmath": "c",
+        "compare": "c"
+    }
 }
