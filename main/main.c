@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 #include "i2c.h"
+#include "esc.h"
 #include "driver\gpio.h"
 #include "freeRTOS\freeRTOS.h"
 #include "freeRTOS\task.h"
@@ -32,7 +33,7 @@ void app_main(void)
 {
     gpio_reset_pin(BUILTIN_LED);
     /* Set the GPIO as a push/pull output */
-    gpio_set_direction(BUILTIN_LED, GPIO_MODE_OUTPUT);
+    //gpio_set_direction(BUILTIN_LED, GPIO_MODE_OUTPUT);
 
     //uart_init();
     i2c_master_init();
@@ -84,11 +85,13 @@ void app_main(void)
     float pi =  3.14159265358979323846;
     float dpr = 57.29578;
 
+    esc_pwm esc = esc_init();
+
     while(1)
     {
-        gpio_set_level(BUILTIN_LED, 1);
-        vTaskDelay(2);
-        gpio_set_level(BUILTIN_LED, 0);
+        //gpio_set_level(BUILTIN_LED, 1);
+        //vTaskDelay(2);
+       // gpio_set_level(BUILTIN_LED, 0);
         read_from_lsm6dsl(OUTX_L_XL, data, 6);
 
         a[0] = (int16_t)(data[0] | data[1] << 8);
@@ -99,8 +102,11 @@ void app_main(void)
         magY = ((float)a[1]) * ares;
         magZ = ((float)a[2]) * ares;
 
-        aAngX = (float)(atan2(magY,magZ)+pi) * dpr;
-        aAngY = (float)(atan2(magY,magX)+pi) * dpr;
+        aAngX = (float)(atan2f(magY,magZ)) * dpr;
+        aAngY = (float)(atan2f(magX,magZ)) * dpr;
+        // aAngY = (float)(asinf)
+
+        esc_speed_control(esc.comparator, (aAngX + 90)/180.0);
 
         vTaskDelay(5);
         //temp = atan2(g[1],g[2]);
@@ -122,7 +128,7 @@ void app_main(void)
         
         //uart_write_bytes(UART_NUM_0, g, 3);
         vTaskDelay(40);
-        on = !on;
+        //on = !on;
     }
 
 }
