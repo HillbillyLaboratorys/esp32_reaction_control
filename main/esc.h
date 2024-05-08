@@ -1,10 +1,10 @@
 #include "driver/mcpwm_prelude.h"
 
-#define MIN_PULSEWIDTH 100 // in us 1000
-#define MAX_PULSEWIDTH 15000 // 2000
+#define MIN_PULSEWIDTH 1 // in us 1000
+#define MAX_PULSEWIDTH 20000 // 2000
 #define ESC_RESOLUTION 1000000 // cycles per tick
 #define ESC_TICKS_PER_PERIOD 20000 // 20 us
-#define ESC_GPIO 2
+#define ESC_GPIO 19
 
 typedef struct 
 {

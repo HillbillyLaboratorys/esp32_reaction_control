@@ -10,6 +10,7 @@
 #define ACC_GRO_CTRL3 0x12
 #define CTRL8_XL 0x17
 #define CTRL2_G 0x11
+#define CTRL7_G 0x16
 #define ACC_CTRL1_XL 0x10 // linear accel
 #define OUTX_L_XL 0x28
 #define OUTX_L_G 0x22

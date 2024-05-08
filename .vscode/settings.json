@@ -18,6 +18,10 @@
     "files.associations": {
         "*.embeddedhtml": "html",
         "cmath": "c",
-        "compare": "c"
+        "compare": "c",
+        "complex": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c"
     }
 }
