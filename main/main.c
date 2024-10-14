@@ -10,7 +10,7 @@
 #include "esp_timer.h"
 #include "pid.h"
 
-#define CAL_ITER 64 // num samples to calibrate gyro
+#define CAL_ITER 20 // num samples to calibrate gyro
 
 #define DT 0.01
 #define PER DT * 1000000 //us
@@ -28,7 +28,7 @@ static void run_pid_callback(void* arg);
 static const char *TAG = "IMU_data";
 void app_main(void)
 {
-    uint32_t prevfreq = 0;
+    uint32_t prevspeed1 = 0;
     int16_t a[3];
     int16_t g[3];
     float magX, magY, magZ;
@@ -48,16 +48,16 @@ void app_main(void)
     //float gx_cal, gy_cal, gz_cal = 0;
 
     PIDParams x_pid_param = {
-        .kp = 0.05,
+        .kp = 10,
         .ki = 0.0,
-        .kd = 0.001
+        .kd = 0.01
     };
 
     double pid_out = 0.0;
 
-    esc_init();
+    esc_pwm esc1 = esc_init();
     
-    ledc_timer_pause(LEDC_MODE, LEDC_TIM);    
+    //ledc_timer_pause(LEDC_MODE, LEDC_TIM);    
 
     //ledc_set_freq(LEDC_HIGH_SPEED_MODE, LEDC_TIMER_0, 10000);
 
@@ -83,9 +83,9 @@ void app_main(void)
     //ctl[0] &= ~0xF0; // clear 4 MSBs
     //ctl[0] = 0b01100011; 
 
-    write_to_lsm6dsl(CTRL2_G, 0b10011100); // gyro 3.33 kHz, 2000 dps, 125dps disabled
+    write_to_lsm6dsl(CTRL2_G, 0b01101100); // 0b10011100 gyro 3.33 kHz, 2000 dps, 125dps disabled
 
-    write_to_lsm6dsl(ACC_CTRL1_XL, 0b10011011); // ACC 3.33 kHz, 4G, ODR/4, 400Hz band
+    write_to_lsm6dsl(ACC_CTRL1_XL, 0b01000111); //0b10011011 ACC 3.33 kHz, 4G, ODR/4, 400Hz band
 
     write_to_lsm6dsl(ACC_GRO_CTRL3, 0b01000100); // block update + auto inc 
 
@@ -139,7 +139,7 @@ void app_main(void)
     uint32_t prev_time = 0;
     uint32_t cur_time = 0;
     float dt = 0;
-    uint32_t enable_step = 0;
+    //uint32_t enable_step = 0;
 
     esp_timer_handle_t cycle_timer;
     ESP_ERROR_CHECK(esp_timer_create(&pid_args, &cycle_timer));
@@ -190,9 +190,9 @@ void app_main(void)
             g[1] = ((int16_t)data[2]) | data[3] << 8;
             g[2] = ((int16_t)data[4]) | data[5] << 8;
            
-            gx_ang += (((float)g[0] - g_cal[0]) * GRES) * dt; //- g_cal[0]
+            gx_ang += (((float)g[0]) * GRES) * dt; //- g_cal[0]
 
-            gy_ang += ((float)g[1] * GRES - g_cal[1]) * dt; 
+            gy_ang += ((float)g[1]) * GRES * dt; 
 
             gz_ang += ((float)g[2]) * GRES * dt; 
 
@@ -205,15 +205,15 @@ void app_main(void)
             pid_out = PID_Compute(&x_pid_param, TARGET_ANGLE, x_filt, dt);
 
             // Send PID output to ESC
-            prevfreq = esc_accel_control(LEDC_MODE, LEDC_TIM, pid_out + prevfreq);
+            prevspeed1 = esc_accel_control(esc1.comparator, pid_out + prevspeed1);
 
             // Enables Stepper on first iteration
-            if (!enable_step) {
-                ledc_timer_resume(LEDC_MODE, LEDC_TIM);
-                enable_step = 1;
-            }
+            // if (!enable_step) {
+            //     ledc_timer_resume(LEDC_MODE, LEDC_TIM);
+            //     enable_step = 1;
+            // }
 
-            ESP_LOGI(TAG, "%f %f  G: %f %f %f PID %f freq %i comp %f\n\r", x_filt, y_filt, gx_ang, gy_ang, dt, pid_out, (int)prevfreq, g_cal[0]
+            ESP_LOGI(TAG, "%f %f  G: %f %f %f PID %f freq %i comp %f\n\r", x_filt, y_filt, gx_ang, gy_ang, dt, pid_out, (int)prevspeed1, g_cal[0]
             );
 
             *run = 0;
