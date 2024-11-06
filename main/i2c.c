@@ -21,17 +21,19 @@ esp_err_t i2c_master_init(void) {
 
 esp_err_t i2c_write_to_bus(uint8_t dev_add, uint8_t* data, size_t len) {
 
-    i2c_cmd_handle_t _cmd_hndl = i2c_cmd_link_create();
-    esp_err_t err = i2c_master_start(_cmd_hndl);
-    if (err != ESP_OK) {
-        return err;
-    }
-    i2c_master_write_byte(_cmd_hndl, (dev_add << 1) | I2C_MASTER_WRITE, true); //read write indication is embedded in the slave adderess
-    i2c_master_write(_cmd_hndl, data, len, true);
-    i2c_master_stop(_cmd_hndl);
-    err = i2c_master_cmd_begin(I2C_PORT, _cmd_hndl, 1000 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(_cmd_hndl);
-    return err;
+    return i2c_master_write_to_device(I2C_PORT, dev_add, data, len, pdMS_TO_TICKS(1000));
+
+    // i2c_cmd_handle_t _cmd_hndl = i2c_cmd_link_create();
+    // esp_err_t err = i2c_master_start(_cmd_hndl);
+    // if (err != ESP_OK) {
+    //     return err;
+    // }
+    // i2c_master_write_byte(_cmd_hndl, (dev_add << 1) | I2C_MASTER_WRITE, true); //read write indication is embedded in the slave adderess
+    // i2c_master_write(_cmd_hndl, data, len, true);
+    // i2c_master_stop(_cmd_hndl);
+    // err = i2c_master_cmd_begin(I2C_PORT, _cmd_hndl, 1000 / portTICK_PERIOD_MS);
+    // i2c_cmd_link_delete(_cmd_hndl);
+    // return err;
 }
 
 esp_err_t i2c_read_from_bus(uint8_t dev_add, uint8_t* data, size_t len) {

@@ -15,20 +15,20 @@ static double integral = 0.0;
 // }
 
 // Compute the PID output based on the setpoint, actual value, and time delta
-double PID_Compute(PIDParams* params, double setpoint, double actual_value, double dt) {
+float PID_Compute(PIDParams* params, float setpoint, float actual_value, float dt) {
     // Calculate error
-    double error = setpoint - actual_value;
+    float error = setpoint - actual_value;
 
     // Proportional term
-    double p_term = params->kp * error;
+    float p_term = params->kp * error;
 
     // Integral term (sum of errors)
     integral += error * dt;
-    double i_term = params->ki * integral;
+    float i_term = params->ki * integral;
 
     // Derivative term (change in error)
-    double derivative = (error - prev_error) / dt;
-    double d_term = params->kd * derivative;
+    float derivative = (error - prev_error) / dt;
+    float d_term = params->kd * derivative;
 
     // Store the current error for the next iteration
     prev_error = error;

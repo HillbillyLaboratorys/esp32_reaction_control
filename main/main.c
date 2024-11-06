@@ -9,6 +9,7 @@
 #include "driver\uart.h"
 #include "esp_timer.h"
 #include "pid.h"
+#include "uartEsc.h"
 
 #define CAL_ITER 20 // num samples to calibrate gyro
 
@@ -16,7 +17,7 @@
 #define PER DT * 1000000 //us
 
 #define FILTER_CONST 0.8
-#define TARGET_ANGLE 0
+#define TARGET_ANGLE 40
 // no need for Acc resolution beacause we use a ratio
 
 //#define CONFIG_ESP_TIMER_SUPPORTS_ISR_DISPATCH_METHOD
@@ -28,34 +29,35 @@ static void run_pid_callback(void* arg);
 static const char *TAG = "IMU_data";
 void app_main(void)
 {
-    uint32_t prevspeed1 = 0;
+    float prevspeed1 = 0;
     int16_t a[3];
     int16_t g[3];
     float magX, magY, magZ;
     float aAngX, aAngY;
     float dpr = 57.29578;
     uint8_t data[12];
-    int16_t tg_cal[3];
+    int32_t tg_cal[3];
     float g_cal[3];
     uint8_t led_s = 0;
     float gx_ang = 0;
     float gy_ang = 0;
     float gz_ang = 0;
     float GRES = 2000.0 / 32768.0; // max 16 bit 65536/2 (for +/-) = 32768, 2000 dps
+    float pid_out = 0.0;
+    uint8_t scaled_out = 0;
 
     float x_filt, y_filt = 0;
 
     //float gx_cal, gy_cal, gz_cal = 0;
 
     PIDParams x_pid_param = {
-        .kp = 10,
+        .kp = 15,
         .ki = 0.0,
         .kd = 0.01
     };
 
-    double pid_out = 0.0;
-
-    esc_pwm esc1 = esc_init();
+    //esc_pwm esc1 = esc_init();
+    //uartEscinit();
     
     //ledc_timer_pause(LEDC_MODE, LEDC_TIM);    
 
@@ -113,16 +115,16 @@ void app_main(void)
     for (uint8_t i = 0; i < CAL_ITER; ++i) {
         read_from_lsm6dsl(OUTX_L_G, data, 6);
 
-        tg_cal[0] += (int16_t)(data[0] | data[1] << 8);
-        tg_cal[1] += (int16_t)(data[2] | data[3] << 8);
-        tg_cal[2] += (int16_t)(data[4] | data[5] << 8);
+        tg_cal[0] += ((int16_t)(data[0] + ((int16_t)data[1] << 8)) * GRES);
+        tg_cal[1] += ((int16_t)(data[2] + ((int16_t)data[3] << 8)) * GRES);
+        tg_cal[2] += ((int16_t)(data[4] + ((int16_t)data[5] << 8)) * GRES);
         led_s = ~led_s;
         gpio_set_level(BUILTIN_LED, led_s);
         vTaskDelay(10);
     }
-    g_cal[0] = (float)tg_cal[0] / (float)CAL_ITER;
-    g_cal[1] = (float)tg_cal[1] / (float)CAL_ITER;
-    g_cal[2] = (float)tg_cal[2] / (float)CAL_ITER;
+    g_cal[0] = ((double)tg_cal[0]) / ((float)CAL_ITER);
+    g_cal[1] = ((double)tg_cal[1]) / ((float)CAL_ITER);
+    g_cal[2] = ((double)tg_cal[2]) / ((float)CAL_ITER);
     gpio_set_level(BUILTIN_LED, 1);
   
     uint8_t temp = 0;
@@ -186,15 +188,22 @@ void app_main(void)
             //temp = atan2(g[1],g[2]);
             //read_from_lsm6dsl(OUTX_L_G, data, 6);
 
-            g[0] = ((int16_t)data[0]) | data[1] << 8;
-            g[1] = ((int16_t)data[2]) | data[3] << 8;
-            g[2] = ((int16_t)data[4]) | data[5] << 8;
+            g[0] = ((int16_t)data[0]) + ((int16_t)data[1] << 8);
+            g[1] = ((int16_t)data[2]) + ((int16_t)data[3] << 8);
+            g[2] = ((int16_t)data[4]) + ((int16_t)data[5] << 8);
            
-            gx_ang += (((float)g[0]) * GRES) * dt; //- g_cal[0]
+            // gx_ang += (((float)(g[0] * GRES)) - g_cal[0])  * dt;
 
-            gy_ang += ((float)g[1]) * GRES * dt; 
+            // gy_ang +=(((float)(g[1] * GRES)) - g_cal[1]) * dt; 
 
-            gz_ang += ((float)g[2]) * GRES * dt; 
+            // gz_ang += (((float)(g[2] * GRES)) - g_cal[3]) * dt; 
+
+            gx_ang += (float)(g[0] * GRES) * dt; //- g_cal[0]
+
+            gy_ang +=(float)(g[1] * GRES) * dt; 
+
+            gz_ang += (float)(g[2] * GRES) * dt; 
+
 
             x_filt = (FILTER_CONST * gx_ang) + ((1-FILTER_CONST) * aAngX);
             y_filt = (FILTER_CONST * gy_ang) + ((1-FILTER_CONST) * aAngY);
@@ -203,9 +212,14 @@ void app_main(void)
             
             // Run PID with new current position and time
             pid_out = PID_Compute(&x_pid_param, TARGET_ANGLE, x_filt, dt);
-
+            prevspeed1 = (pid_out - prevspeed1) + prevspeed1;
+            if (prevspeed1 < -127) prevspeed1 = -127;
+            if (prevspeed1 > 127) prevspeed1 = 127;
+            scaled_out = prevspeed1 + 127;
             // Send PID output to ESC
-            prevspeed1 = esc_accel_control(esc1.comparator, pid_out + prevspeed1);
+            i2c_write_to_bus(4, &scaled_out, 1);
+            //prevspeed1 = esc_accel_control(esc1.comparator, pid_out + prevspeed1);
+            //sendUartEsc(prevspeed1);
 
             // Enables Stepper on first iteration
             // if (!enable_step) {
@@ -213,7 +227,7 @@ void app_main(void)
             //     enable_step = 1;
             // }
 
-            ESP_LOGI(TAG, "%f %f  G: %f %f %f PID %f freq %i comp %f\n\r", x_filt, y_filt, gx_ang, gy_ang, dt, pid_out, (int)prevspeed1, g_cal[0]
+            ESP_LOGI(TAG, "%f %f  G: %f %f %f PID %f freq %i comp %f\n\r", x_filt, dt, gx_ang, gy_ang, dt, pid_out, (int)prevspeed1, g_cal[0]
             );
 
             *run = 0;
